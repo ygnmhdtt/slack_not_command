@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"strings"
 	"syscall"
+
+	"github.com/nlopes/slack"
 )
 
 func main() {
@@ -23,10 +25,28 @@ func main() {
 	cmd := exec.Command(commandName, options...)
 
 	_, _, exitCode, err := runCommand(cmd)
-	fmt.Printf("exit code: %d\n", exitCode)
 	if err != nil {
 		log.Fatal(err)
 	}
+	notifySlack(os.Getenv("SN_TOKEN"), os.Getenv("SN_CHANNEL"), commandName, options, exitCode)
+	fmt.Printf("exit code: %d\n", exitCode)
+}
+
+func notifySlack(token string, channel string, commandName string, options []string, exitCode int) error {
+	api := slack.New(token)
+	params := slack.NewPostMessageParameters()
+	_, _, err := api.PostMessage(channel, text(commandName, options, exitCode), params)
+	return err
+}
+
+func text(commandName string, options []string, exitCode int) string {
+	var t string
+	if len(options) == 0 {
+		t = commandName
+	} else {
+		t = fmt.Sprintf("%v %v", commandName, strings.Join(options[:], " "))
+	}
+	return fmt.Sprintf("ローカルの \"%v\" が完了しました!! 終了コード: %v", t, exitCode)
 }
 
 func runCommand(cmd *exec.Cmd) (stdout, stderr string, exitCode int, err error) {
